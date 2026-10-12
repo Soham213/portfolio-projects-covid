@@ -111,25 +111,42 @@ from PopvsVac
 --Temp table
 -- 1. Drop the table if it already exists so you start with a clean slate
 DROP TABLE IF EXISTS #PercentPopulationVaccinated;
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+Population numeric,
+New_vaccinations numeric,
+RollingPeopleVaccinated numeric
+)
 
-CREATE TABLE #PercentPopulationVaccinated (
-    continent nvarchar(255),
-    location nvarchar(255),
-    date datetime,
-    population numeric,
-    New_Vaccinations numeric,
-    RollingPeopleVaccinated numeric
-);
+Insert into #PercentPopulationVaccinated
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, sum( convert(int,vac.new_vaccinations)) 
+over (Partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+from[PORTFOLIO Projects]..CovidDeaths dea
+join [PORTFOLIO Projects]..CovidVaccination vac
+on dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null 
+--order by 2,3 
 
-INSERT INTO #PercentPopulationVaccinated
-SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
-    -- 2. Changed 'int' to 'bigint' to prevent overflow, and fixed the alias name
-    SUM(CONVERT(bigint, vac.new_vaccinations)) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date) AS RollingPeopleVaccinated 
-FROM [PORTFOLIO Projects]..CovidDeaths dea
-JOIN [PORTFOLIO Projects]..CovidVaccination vac
-    ON dea.location = vac.location
-    AND dea.date = vac.date
-WHERE dea.continent IS NOT NULL;
+Select *, (RollingPeopleVaccinated/Population)*100
+From #PercentPopulationVaccinated
 
-SELECT *, (RollingPeopleVaccinated/population)*100
-FROM #PercentPopulationVaccinated;
+use [PORTFOLIO Projects]
+go
+--drop view if exists PercentPopulationVaccinated
+Create View PercentPopulationVaccinated as
+Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(int,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location,
+  dea.Date) as RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+From [PORTFOLIO Projects]..CovidDeaths dea
+Join [PORTFOLIO Projects]..CovidVaccination vac
+  On dea.location = vac.location
+  and dea.date = vac.date
+where dea.continent is not null
+--order by 2,3
+
+SELECT * FROM PercentPopulationVaccinated;
